@@ -1,14 +1,13 @@
 <idea-plugin>
   <id>com.your.company.unique.plugin.id</id>
-  <name>Plugin display name here</name>
+  <name>Lyra-Checker</name>
   <version>1.0</version>
-  <vendor email="support@yourcompany.com" url="http://www.yourcompany.com">YourCompany</vendor>
+  <vendor email="radwa.abdelbar@inf.ethz.ch" url="http://www.yourcompany.com">YourCompany</vendor>
   <depends>com.intellij.modules.python</depends>
 
-  <description><![CDATA[
-      Enter short description for your plugin here.<br>
-      <em>most HTML tags may be used</em>
-    ]]></description>
+  <description>
+
+  </description>
 
   <change-notes><![CDATA[
       Add change notes here.<br>
@@ -36,7 +35,11 @@
   </extensions>
 
   <actions>
-    <!-- Add your actions here -->
+    <!--toolbar-->
+    <action class="ChooseFile" id="file-chooser" description="Chooses input file to check" text="Choose input file" >
+      <add-to-group group-id="ToolbarRunGroup" anchor="before" relative-to-action="Stop"/>
+    </action>
   </actions>
+
 
 </idea-plugin>

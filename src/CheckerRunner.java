@@ -1,3 +1,4 @@
+import com.intellij.codeInsight.BaseExternalAnnotationsManager;
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configurations.RunProfile;
 import com.intellij.execution.configurations.RunProfileState;
@@ -8,18 +9,29 @@ import com.intellij.openapi.actionSystem.PlatformDataKeys;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.ui.MessageType;
+import com.intellij.openapi.ui.popup.Balloon;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
+import com.intellij.openapi.wm.StatusBar;
+import com.intellij.openapi.wm.WindowManager;
+import com.intellij.ui.awt.RelativePoint;
 import com.jetbrains.python.run.PythonRunConfiguration;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.awt.*;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.StringTokenizer;
 
 public class CheckerRunner extends GenericProgramRunner {
     public static String codeFilePath, inputFilePath;
-    public static long lastModificationStamp;
+    static HashMap<String, ArrayList<CheckerError>> errors = new HashMap<>();
     @NotNull
     @Override
     public String getRunnerId() {
@@ -35,16 +47,19 @@ public class CheckerRunner extends GenericProgramRunner {
 
     @Override
     protected RunContentDescriptor doExecute(@NotNull RunProfileState state, @NotNull ExecutionEnvironment env) throws ExecutionException {
-        Editor editor = env.getDataContext().getData(PlatformDataKeys.EDITOR);
-        if (editor == null) {
-            throw new NullPointerException("Editor is null");
-        }
+        //system path separator
         String sep = File.separatorChar + "";
-        // get the path to the current open file -- the input file to be checked
-        Document document =  editor.getDocument();
-        System.out.println("HERE");
-        VirtualFile inputFile = FileDocumentManager.getInstance().getFile(document);
-        inputFilePath = inputFile.getCanonicalPath();
+        Project project = env.getProject();
+        StatusBar statusBar = WindowManager.getInstance().getStatusBar(project);
+        if (inputFilePath == null) {
+            JBPopupFactory.getInstance()
+                    .createHtmlTextBalloonBuilder("Choose input file first.", IconLoader.findIcon("file-icon.png"), Color.LIGHT_GRAY, null)
+                    .setFadeoutTime(7500)
+                    .createBalloon()
+                    .show(RelativePoint.getCenterOf(statusBar.getComponent()),
+                            Balloon.Position.atRight);
+            return null;
+        }
 
         // get path to lyra in the virtual environment
         PythonRunConfiguration runConfiguration = (PythonRunConfiguration) env.getRunProfile();
@@ -54,45 +69,75 @@ public class CheckerRunner extends GenericProgramRunner {
         String lyraPath = String.join(sep, array);
         System.out.println("Lyra path: " + lyraPath);
 
-//        //get path to code file to be analised
+        //get path to code file to be analysed
         codeFilePath = runConfiguration.getScriptName();
         System.out.println("Code path: " + codeFilePath);
         System.out.println("Input file path: " + inputFilePath);
-        File file = new File(codeFilePath);
-        long newModificationStamp = file.lastModified();
-        boolean code_modified = newModificationStamp > lastModificationStamp;
-        lastModificationStamp = newModificationStamp;
-//        System.out.println("Modification stamps: " + newModificationStamp + " " + lastModificationStamp);
-//        System.out.println("Code modified: " + code_modified);
-        String command = lyraPath + " --analysis assumptions " + codeFilePath + " " + inputFilePath;
-        System.out.println("Final command: " + command);
 
+        if (codeFilePath == null || inputFilePath == null)
+            return null;
+
+        String command = lyraPath + " --analysis assumptions " + codeFilePath + " " + inputFilePath;
+        System.out.println("command: " + command);
         try {
-           Process proc =  Runtime.getRuntime().exec(command);
+
+            Process proc =  Runtime.getRuntime().exec(command);
             BufferedReader br;
             String line  = null;
-//            br = new BufferedReader(new InputStreamReader(proc.getInputStream()));
-//            System.out.println("-------Input stream-------");
-//            while((line = br.readLine()) != null) {
-//                System.out.println(line);
-//            }
+            br = new BufferedReader(new InputStreamReader(proc.getInputStream()));
+            System.out.println("-------Input stream-------");
+            while((line = br.readLine()) != null) {
+                System.out.println(line);
+            }
 
             br = new BufferedReader(new InputStreamReader(proc.getErrorStream()));
             System.out.println("-------Error stream-------");
             while((line = br.readLine()) != null) {
                 System.out.println(line);
             }
+
         } catch (IOException e) {
             e.printStackTrace();
         }
 
+        //write errors
+        String errorFilePath = inputFilePath + ".err";
+        ArrayList<CheckerError> errorList = new ArrayList<>();
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(errorFilePath));
+            String line = null;
+            String separator = br.readLine();
+            while((line = br.readLine()) != null) {
+                StringTokenizer st = new StringTokenizer(line, separator);
+                int line_number = Integer.parseInt(st.nextToken())  - 1;
+                int startOffset = Integer.parseInt(st.nextToken());
+                int endOffset = Integer.parseInt(st.nextToken());
+                CheckerError error = new CheckerError(line_number, startOffset, endOffset, st.nextToken());
+                errorList.add(error);
+            }
+            System.out.println("ERRORS WRITTEN");
+            System.out.println(errorList.toString());
+            if (errorList.isEmpty()) {
+                String filename = VirtualFileManager.getInstance().refreshAndFindFileByUrl(inputFilePath).getName();
+                JBPopupFactory.getInstance()
+                        .createHtmlTextBalloonBuilder("No errors found in file" + filename + ".", MessageType.INFO, null)
+                        .setFadeoutTime(7500)
+                        .createBalloon()
+                        .show(RelativePoint.getCenterOf(statusBar.getComponent()),
+                                Balloon.Position.atRight);
+            }
+            errors.put(inputFilePath, errorList);
+            VirtualFileManager.getInstance().refreshWithoutFileWatcher(false);
+
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
         return null;
     }
 
-    private String getCwd() {
-        String s = this.getClass().getClassLoader().getResource("").getPath();
-        System.out.println(s);
-//        /home/radwa/IdeaProjects/lyra-checker/venv
-       return s;
-    }
 }

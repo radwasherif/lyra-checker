@@ -6,8 +6,8 @@ import org.jetbrains.annotations.NotNull;
 import javax.swing.*;
 
 public class CheckerExecutor extends Executor {
-    public static final Icon LYRA_ICON = IconLoader.findIcon("/icon.png");
-    public static final String EXECUTOR_ID = "MyChecker";
+    public static final Icon LYRA_ICON = IconLoader.findIcon("icon.png");
+    public static final String EXECUTOR_ID = "Lyra-Checker";
     @Override
     public String getToolWindowId() {
         return ToolWindowId.RUN;
