@@ -2,9 +2,16 @@ import com.intellij.lang.annotation.AnnotationHolder;
 import com.intellij.lang.annotation.Annotator;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.ui.MessageType;
+import com.intellij.openapi.ui.popup.Balloon;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
+import com.intellij.openapi.wm.StatusBar;
+import com.intellij.openapi.wm.WindowManager;
 import com.intellij.psi.PsiElement;
+import com.intellij.ui.awt.RelativePoint;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
@@ -48,12 +55,26 @@ public class InputAnnotator implements Annotator {
                     int endOffset = document.getLineEndOffset(line_number);
                     String message = st.nextToken();
                     System.out.printf("Line %d, [%d, %d], Message: %s\n", line_number, startOffset, endOffset, message);
-                    annotationHolder.createErrorAnnotation(new TextRange(startOffset, endOffset), message);
+                    if(line_number < document.getLineCount())
+                        annotationHolder.createErrorAnnotation(new TextRange(startOffset, endOffset), message);
                 }
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                StatusBar statusBar = WindowManager.getInstance().getStatusBar(element.getProject());
+                JBPopupFactory.getInstance()
+                        .createHtmlTextBalloonBuilder("Annotation file not found. Please try again.", MessageType.ERROR, null)
+                        .setFadeoutTime(7500)
+                        .createBalloon()
+                        .show(RelativePoint.getCenterOf(statusBar.getComponent()),
+                                Balloon.Position.atRight);
             } catch (IOException e) {
-                e.printStackTrace();
+
+                StatusBar statusBar = WindowManager.getInstance().getStatusBar(element.getProject());
+                JBPopupFactory.getInstance()
+                        .createHtmlTextBalloonBuilder("Annotation I/O exception.", MessageType.ERROR, null)
+                        .setFadeoutTime(7500)
+                        .createBalloon()
+                        .show(RelativePoint.getCenterOf(statusBar.getComponent()),
+                                Balloon.Position.atRight);
             }
 
         }
