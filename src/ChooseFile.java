@@ -2,11 +2,20 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
+import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.fileTypes.PlainTextFileType;
+import com.intellij.openapi.ui.popup.Balloon;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.newvfs.impl.VirtualFileImpl;
+import com.intellij.openapi.wm.StatusBar;
+import com.intellij.openapi.wm.WindowManager;
+import com.intellij.ui.awt.RelativePoint;
 import com.intellij.util.Consumer;
+
+import java.awt.*;
 
 public class ChooseFile extends AnAction {
 
@@ -26,7 +35,20 @@ public class ChooseFile extends AnAction {
         }
         InputConsumer consumer = new InputConsumer();
         FileChooser.chooseFile(descriptor, anActionEvent.getProject(), toSelect, consumer);
-        CheckerRunner.inputFile = consumer.inputFile;
+        FileType type = consumer.inputFile.getFileType();
+        if (type != PlainTextFileType.INSTANCE) {
+            StatusBar statusBar = WindowManager.getInstance().getStatusBar(anActionEvent.getProject());
+            JBPopupFactory.getInstance()
+
+                    
+                    .createHtmlTextBalloonBuilder("Choose an input text file.", IconLoader.findIcon("file-icon.png"), Color.LIGHT_GRAY, null)
+                    .setFadeoutTime(7500)
+                    .createBalloon()
+                    .show(RelativePoint.getCenterOf(statusBar.getComponent()),
+                            Balloon.Position.atRight);
+        } else {
+            CheckerRunner.inputFile = consumer.inputFile;
+        }
         System.out.println("5-* SET INPUT FILE");
     }
 

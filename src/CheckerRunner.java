@@ -5,8 +5,6 @@ import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.execution.runners.GenericProgramRunner;
 import com.intellij.execution.ui.RunContentDescriptor;
 import com.intellij.ide.SaveAndSyncHandlerImpl;
-import com.intellij.openapi.actionSystem.PlatformDataKeys;
-import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.MessageType;
@@ -22,12 +20,10 @@ import com.jetbrains.python.run.PythonRunConfiguration;
 import org.jetbrains.annotations.NotNull;
 
 import java.awt.*;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.StringTokenizer;
 
 public class CheckerRunner extends GenericProgramRunner {
     public static String codeFilePath, inputFilePath;
@@ -102,22 +98,44 @@ public class CheckerRunner extends GenericProgramRunner {
             }
             System.out.println("-------Error stream end-------");
 
-            Thread.sleep(500);
+            Thread.sleep(300);
             SaveAndSyncHandlerImpl.getInstance().refreshOpenFiles();
 //          inputFile.refresh(true, true);
-//          FileDocumentManager.getInstance().reloadFiles(inputFile);
+//            FileDocumentManager.getInstance().reloadFiles(inputFile);
             VirtualFileManager.getInstance().refreshWithoutFileWatcher(false);
+            System.out.println("6- Refreshing input file " + inputFilePath);
+
             String errFilePath = inputFilePath + ".err";
             File errFile = new File(errFilePath);
             if (errFile.exists() && errFile.length() == 0) {
                 String filename = inputFile.getName();
+
                 JBPopupFactory.getInstance()
                         .createHtmlTextBalloonBuilder("No errors found in file " + filename + ".", MessageType.INFO, null)
                         .createBalloon()
                         .show(RelativePoint.getCenterOf(statusBar.getComponent()),
                                 Balloon.Position.atRight);
+            } else {
+                br = new BufferedReader(new FileReader(errFile));
+                String separator = br.readLine();
+                StringTokenizer st = new StringTokenizer(br.readLine(), separator);
+                String line_number = st.nextToken();
+                st.nextToken();
+                st.nextToken();
+                String message = st.nextToken();
+                message = "Please fix error on line " + line_number + " : " + message;
+//                System.out.println("SHOWING BALLOON " + message);
+                JBPopupFactory.getInstance()
+                        .createHtmlTextBalloonBuilder(message, MessageType.ERROR, null)
+                        .setHideOnClickOutside(false)
+                        .setHideOnCloseClick(true)
+                        .setHideOnKeyOutside(false)
+                        .createBalloon()
+                        .show(RelativePoint.getCenterOf(statusBar.getComponent()),
+                                Balloon.Position.atRight);
+//                JBPopupFactory.getInstance()
+//                        .createMessage(message).show(RelativePoint.getCenterOf(statusBar.getComponent()));
             }
-            System.out.println("6- Refreshing input file " + inputFilePath);
         } catch (IOException e) {
             JBPopupFactory.getInstance()
                     .createHtmlTextBalloonBuilder("Checker runner I/O exception.", MessageType.ERROR, null)
