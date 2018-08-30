@@ -1,0 +1,3 @@
+- The plug-in must run on IntelliJ with the Python plug-in installed
+- Project running the plug-in must have Lyra installed in its Python virtual environment
+        venv/bin/lyra
